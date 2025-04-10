@@ -38,6 +38,11 @@ function script.update(dt)
     end
   else
     ac.log("ERROR - Session Invalid")
+
+    -- Ensure AI drivers are visible in replay mode
+    if ac.getSim().isReplayActive == true then
+      SetAllAIDriversVisible()
+    end
   end
 end
 
@@ -161,6 +166,15 @@ function KeepCarsSentToPitsStoppedInBox()
       physics.setGentleStop(i, true)
       ac.setDriverVisible(i, false)
     end
+  end
+end
+
+
+function SetAllAIDriversVisible()
+  -- Loop through ai drivers
+  for i = 1, (ac.getSim().carsCount - 1), 1
+  do
+    ac.setDriverVisible(i, true)
   end
 end
 
