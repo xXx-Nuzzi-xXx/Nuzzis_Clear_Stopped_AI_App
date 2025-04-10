@@ -2,13 +2,13 @@
 
 -- USER VARS START
 local hideDisableTrackPhysicsSection = false -- Set to true to hide this part of the in session UI.
+local TimeStationaryToCauseRetirement = 7    -- How long in seconds an AI is stationary on track before being retired to pits. (recommended 5 - 10)
 -- USER VARS END
 
 -- Global Vars
 local aiDriversStationaryTime = {}
 local hasDriverBeenSentToPits = {}
 local firstFrame = true
-local TimeStationaryToCauseRetirement = 7
 local driverFocusedInUI = 1
 
 -- Runs once on session restart
