@@ -1,236 +1,236 @@
 -- Author - Nuzzi
 
 -- USER VARS START
-local allowLowerCspVersions = false  -- Set this to true to make minimum CSP version allowed CSP 0.2.0.  (Warning likely to experience bugs!)
+local hideDisableTrackPhysicsSection = false -- Set to true to hide this part of the in session UI.
 -- USER VARS END
 
 -- Global Vars
-local driverCount = 0
 local aiDriversStationaryTime = {}
 local hasDriverBeenSentToPits = {}
-local sessionState = "Initial Setup"
+local firstFrame = true
 local TimeStationaryToCauseRetirement = 10
-local RaceStartTimer = 0
+local driverFocusedInUI = 1
 
 -- Runs once on session restart
 ac.onSessionStart(function(sessionIndex, restarted)
-  -- Check CSP version is supported
-  if CheckCspVersion() then
+  if CheckSessionValidity() == true then
     ac.log("---------------------")
     ac.log("Session Restarted")
     ac.log("---------------------")
-    sessionState = "Initial Setup"
+    firstFrame = true
   end
 end)
 
 -- Runs once per frame
 ---@diagnostic disable-next-line: duplicate-set-field
 function script.update(dt)
-  -- Check session is offline
-  if ac.getSim().isOnlineRace == false then
-    -- Check CSP version is supported
-    if CheckCspVersion() then
-      -- Check physics is allowed
-      if physics.allowed() == true then
-        -- Check not in replay mode
-        if ac.getSim().isReplayActive == false then
-          -- Runs once at session start & restart
-          if sessionState == "Initial Setup" then
-            driverCount = ac.getSim().carsCount - 1
-            SetupAiDriverStoppedTimeArray()
-            ResetCarsRetiredOnRaceStart()
-            RaceStartTimer = 0
-            sessionState = "Waiting on Race Start"
-            ac.log("Session Setup Complete, waiting on Race Start")
-          end
-          -- Run Once Each Frame
-          if sessionState == "Waiting on Race Start" then
-            CheckForRaceStart()
-          end
-          if sessionState == "Race Started" then
-            HandleAnyCarsStoppedAtRaceStart()
-            CheckAllAiForStopped(dt)
-            ResetStationaryTimerIfGotGoingAgain()
-            KeepCarsSentToPitsStoppedInBox()
-          end
-        else
-          ac.log("App in-active whilst in replay mode.")
-        end
-      else
-        ac.log("App in-active, physics not enabled for track.")
+  if CheckSessionValidity() == true then
+    -- Run once at session start & restart
+    if firstFrame == true then
+      ConstructAiDriverArrays()
+      firstFrame = false
+      driverFocusedInUI = 1
+      ac.log("Setup Complete")
+    else -- Run Once Each Frame
+      -- Only run over duration of the race
+      if ac.getSim().isSessionStarted == true and ac.getSim().isSessionFinished == false then
+        CheckAllAiForStopped(dt)
+        KeepCarsSentToPitsStoppedInBox()
       end
     end
   else
-    ac.log("App in-active, current session is online")
+    ac.log("ERROR - Session Invalid")
   end
 end
 
 -- Runs once per frame on the Main window
 ---@diagnostic disable-next-line: duplicate-set-field
 function script.windowMain(dt)
-  -- Check session is offline
-  if ac.getSim().isOnlineRace == false then
-    -- Check CSP version is supported
-    if CheckCspVersion() then
-      -- Check physics is enabled
-      if physics.allowed() == false then
-        -- Button to enable physics here.
-        if ui.button("Enable Track Physics") then
-          EnablePhysics()
-          ui.toast(ui.Icons.Code, "Track Physics Enabled, restart from C.M to apply.")
-        end
-        ui.newLine(3)
-        ui.text("Track layout physics must be enabled for this app to work.")
-      else
-        -- Button to disable track physics
-        if ui.button("Reset track physics for playing online") then
-          DisablePhysics()
-          ui.toast(ui.Icons.Code, "Track Physics Disabled, restart from C.M to apply.")
-        end
-        -- Driver Live Info
-        for i = 1, ac.getSim().carsCount - 1, 1
-        do
-          ui.text("Session Info:")
-          ui.text("Current Session Type: " .. ac.getSessionName(ac.getSim().currentSessionIndex))
-          ui.text("Session State: " .. sessionState)
-          ui.text("--------------------------")
-          ui.text(ac.getDriverName(i) .. "")
-          ui.text("Current Lap: " .. ac.getCar(i).lapCount + 1)
-          ui.text("Time Stopped on track: " .. math.round(aiDriversStationaryTime[i], 1))
-          if hasDriverBeenSentToPits[i] == nil then
-            ui.text("Has Driver retired & been sent to pits? False")
-          else
-            ui.text("Has Driver retired & been sent to pits? " .. tostring(hasDriverBeenSentToPits[i]))
-          end
-        end
+  -- BG + Border
+  ui.drawRectFilled(10, vec2(ui.windowWidth(), ui.windowHeight()), rgbm.colors.black, nil, nil)
+  ui.drawRect(10, vec2(ui.windowWidth()-10, ui.windowHeight()-1), rgbm.colors.cyan, nil, nil, 4)
+
+  -- Title
+  ui.dwriteDrawTextClipped("Clear Stopped AI Monitor", 18, vec2(10,10), vec2(260,40), ui.Alignment.Center, ui.Alignment.End, true, rgbm.colors.white)
+  ui.drawLine(vec2(0,45), vec2(ui.windowWidth(), 45), rgbm.colors.cyan, 3)
+  ui.newLine(40)
+
+  -- Check session valid
+  if CheckSessionValidity() == true then
+    -- Buttons to navigate UI
+    ui.columns(3, false)
+    ui.setColumnWidth(0, 10)
+    ui.setColumnWidth(1, 110)
+    ui.setColumnWidth(2, 110)
+    ui.nextColumn()
+    if ui.modernButton("Last", vec2(90,35), nil, ui.Icons.ArrowLeft, 15, nil) then
+      if driverFocusedInUI > 1 then -- Don't let lower than 1
+        driverFocusedInUI = driverFocusedInUI -1
       end
-    else
-      ui.text("CSP too low. (Check Lua Debug App in-game for more info.)")
     end
-  else
-    ui.text("App only active in offline sessions.")
+    ui.nextColumn()
+    if ui.modernButton("Next", vec2(90,35), nil, ui.Icons.ArrowRight, 15, nil) then
+      if driverFocusedInUI < ac.getSim().carsCount - 1 then -- Don't let higher than cars available
+        driverFocusedInUI = driverFocusedInUI +1
+      end
+    end
+    ui.columns(0)
+    ui.newLine(1)
+
+    -- Show Driver Live Info
+    ui.text("  " .. ac.getDriverName(driverFocusedInUI))
+    ui.text("  Lap: " .. ac.getCar(driverFocusedInUI).lapCount + 1)
+    ui.text("  Time Stopped on track: " .. math.round(aiDriversStationaryTime[driverFocusedInUI], 1))
+    ui.text("  Has retired: " .. tostring(hasDriverBeenSentToPits[driverFocusedInUI]))
+
+    -- Disable track physics button
+    ShowDisableTrackPhysicsButton()
+  else -- Session Invalid
+    -- CSP too low
+    if ac.getPatchVersionCode() < 3281 then -- 3281 == CSP 0.2.6  (Preview versions min CSP 0.2.7 - preview)
+      ui.text("    ERROR: CSP version too low:")
+      ui.text("    Min free = 0.2.6")
+      ui.text("    Min paid = 0.2.7 preview")
+
+    -- Not in race session
+    elseif ac.getSessionName(ac.getSim().currentSessionIndex) ~= "Quick Race" and ac.getSessionName(ac.getSim().currentSessionIndex) ~= "Race" then
+      ui.text("    NOTE: Not in race session: ")
+      ui.text("          App inactive.")
+
+    -- Track Physics
+    elseif physics.allowed() == false then
+      ui.text("   ERROR: Track Physics is disabled")
+      ShowEnableTrackPhysicsButton()
+
+    -- Online Session
+    elseif ac.getSim().isOnlineRace == true then
+      ui.text("  NOTE: Online session, app inactive")
+
+    -- Unknown error
+    else
+      ui.text("       ERROR: Unknown error.")
+    end
+
+    ui.newLine(0)
   end
 end
 
 -- FUNCTIONS
-function SetupAiDriverStoppedTimeArray()
-  -- Loop through ai drivers
-  for i = 1, driverCount, 1
-  do
-    aiDriversStationaryTime[i] = 0
+function CheckSessionValidity()
+  if ac.getPatchVersionCode() < 3281 then -- 3281 == CSP 0.2.6  (Preview versions min CSP 0.2.7 - preview)
+    ac.log("CSP version too low")
+    return false
   end
+
+  if ac.getSessionName(ac.getSim().currentSessionIndex) ~= "Quick Race" and ac.getSessionName(ac.getSim().currentSessionIndex) ~= "Race" then
+    ac.log("Not in a race session")
+    return false
+  end
+
+  if physics.allowed() == false then
+    ac.log("Track Physics is not enabled")
+    return false
+  end
+
+  if ac.getSim().isReplayActive == true then
+    ac.log("In Replay mode, app inactive")
+    return false
+  end
+
+  if ac.getSim().isOnlineRace == true then
+    ac.log("Not in an offline session")
+    return false
+  end
+
+  return true
 end
 
-function CheckForRaceStart()
-  if ac.getSim().isSessionStarted == true then
-    sessionState = "Race Started"
-    ac.log("Race Started")
+function ConstructAiDriverArrays()
+  -- Loop through ai drivers
+  for i = 1, (ac.getSim().carsCount - 1), 1
+  do
+    aiDriversStationaryTime[i] = 0
+    hasDriverBeenSentToPits[i] = false
   end
 end
 
 function CheckAllAiForStopped(dt)
   -- Loop through ai drivers
-  for i = 1, driverCount, 1
+  for i = 1, (ac.getSim().carsCount - 1), 1
   do
     -- Count stationary time when out on track and stopped.
     if ac.getCar(i).speedKmh < 5 and ac.getCar(i).isInPitlane == false and ac.getCar(i).isInPit == false then
       aiDriversStationaryTime[i] = aiDriversStationaryTime[i] + dt
     end
 
-    -- Send back to pits when stopped on track too long.
-    if aiDriversStationaryTime[i] > TimeStationaryToCauseRetirement and ac.getCar(i).isInPit == false and ac.getCar(i).isInPitlane == false  then
-      SendBackToPits(i)
+    -- Send back to pits when stopped on track too long, only do once
+    if aiDriversStationaryTime[i] > TimeStationaryToCauseRetirement and hasDriverBeenSentToPits[i] == false and ac.getCar(i).isInPit == false and ac.getCar(i).isInPitlane == false then
+      physics.teleportCarTo(i, ac.SpawnSet.Pits)
+      hasDriverBeenSentToPits[i] = true
+      ac.log(ac.getDriverName(i) .. " has been retired and was sent to the pits")
     end
-  end
-end
 
-function SendBackToPits(i)
-  physics.teleportCarTo(i, ac.SpawnSet.Pits)
-  hasDriverBeenSentToPits[i] = true
-  aiDriversStationaryTime[i] = 0
-  ac.log(ac.getDriverName(i) .. " was stopped & has been retired to pits")
-end
-
-function ResetStationaryTimerIfGotGoingAgain()
-  for i = 1, driverCount, 1
-  do
-    if ac.getCar(i).speedKmh > 50 then
+    -- Reset counter if they have got going again
+    if ac.getCar(i).speedKmh > 25 then
       aiDriversStationaryTime[i] = 0
     end
   end
 end
 
-function ResetCarsRetiredOnRaceStart()
-  for i = 1, driverCount, 1
+function KeepCarsSentToPitsStoppedInBox()
+  for i = 1, (ac.getSim().carsCount - 1), 1
   do
     if hasDriverBeenSentToPits[i] == true then
-      hasDriverBeenSentToPits[i] = false
-      ac.setDriverVisible(i, true)
-      physics.setAIThrottleLimit(i, 1)
-      ac.log(ac.getDriverName(i) .. " reset to normal as retired")
-      -- Still won't pull away with the rest of the grid but that is a CSP issue.
+      physics.overrideSteering(i, 0)
+      physics.setGentleStop(i, true)
     end
   end
 end
 
-function KeepCarsSentToPitsStoppedInBox()
-  for i = 1, driverCount, 1
-  do
-    -- if not Quick Race or Race then allow rejoin
-    if ac.getSessionName(ac.getSim().currentSessionIndex) == "Quick Race" or ac.getSessionName(ac.getSim().currentSessionIndex) == "Race" then
-      if hasDriverBeenSentToPits[i] == true and ac.getCar(i).isInPitlane == true or ac.getCar(i).isInPit == true then
-        physics.overrideSteering(i, 0)
-        physics.setAIThrottleLimit(i, 0)
-        physics.teleportCarTo(i, ac.SpawnSet.Pits)
-        physics.resetCarState(i, 0.5)
-        ac.setDriverVisible(i, false)
-      end
+-- UI FUNCTIONS
+function ShowEnableTrackPhysicsButton()
+  -- Setup Columns
+  ui.columns(2, false, "Enable Track Physics Button Columns")
+  ui.setColumnWidth(0, 33)
+  ui.setColumnWidth(1, 200)
+  ui.nextColumn()
+
+  if ui.button("Enable Track Physics") then
+    EnablePhysics()
+    ui.toast(ui.Icons.Confirm, "Track Physics Enabled, please restart to apply.")
+  end
+
+  -- End columns
+  ui.columns(0)
+end
+
+function ShowDisableTrackPhysicsButton()
+  if hideDisableTrackPhysicsSection == false then
+    ui.text("________________________________")
+
+    -- Setup Columns
+    ui.columns(2, false, "Disable Track Physics Button Columns")
+    ui.setColumnWidth(0, 33)
+    ui.setColumnWidth(1, 200)
+    ui.nextColumn()
+
+    if ui.button("Disable Track Physics") then
+     DisablePhysics()
+     ui.toast(ui.Icons.LoadingSpinner, "Track Physics Disabled, please restart to apply.")
     end
+
+    -- End columns
+    ui.columns(0)
+
+    ui.pushFont(5)
+    ui.text("  Press if you enabled them and")
+    ui.text("  want to use track online. It")
+    ui.text("  will stop server 'Checksum error'")
+    ui.pushFont(4)
   end
 end
 
-function HandleAnyCarsStoppedAtRaceStart()
-  for i = 1, driverCount, 1
-  do
-    -- Only start counting timer on race start
-    if ac.getSim().isSessionStarted == true then
-      RaceStartTimer = math.round((-1 * ac.getSim().timeToSessionStart) / 1000, 1)
-      --ac.log("Race Timer = " .. RaceStartTimer)
-      -- Check for a couple seconds at race start
-      if RaceStartTimer >= 1 and RaceStartTimer <= 2 then
-        --ac.log("Checking for race start stalled car")
-        -- Check if driver is not in pitbox or pitlane
-        if ac.getCar(i).isInPit == false or ac.getCar(i).isInPitlane == false then
-          -- Check if driver is not pressing the throttle
-          if ac.getCar(i).gas < 0.1 then
-            -- Send to pits
-            ac.log(ac.getDriverName(i) .. " stuck at race start, sent to pits")
-            SendBackToPits(i)
-          end
-        end
-      end
-    end
-  end
-end
-
-function CheckCspVersion()
-  if allowLowerCspVersions == true then
-    if ac.getPatchVersionCode() >= 2651 then -- 2651 == CSP 0.2.0
-      return true
-    else
-      ac.log("ERROR: CSP too low. Minimum CSP 0.2.0 when allowing lower versions.")
-      return false
-    end
-  else
-    if ac.getPatchVersionCode() >= 3044 then -- 3044 == CSP 0.2.3  (Preview versions min CSP 0.2.4 - preview)
-      return true
-    else
-      ac.log("ERROR: CSP too low. Minimum free version is CSP 0.2.3.  Minimum preview version is CSP 0.2.4 - Preview.")
-      return false
-    end
-  end
-end
-
+-- MISC FUNCTIONS
 function EnablePhysics()
   local trackFolderPath = ac.getFolder(tostring(ac.FolderID.ContentTracks)) .. "\\" .. ac.getTrackID()
   local surfacesFilePath = trackFolderPath .. "\\" .. ac.getTrackLayout() .. "\\data\\surfaces.ini"
