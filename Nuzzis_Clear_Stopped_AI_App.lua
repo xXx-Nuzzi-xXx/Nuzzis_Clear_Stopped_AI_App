@@ -8,17 +8,15 @@ local hideDisableTrackPhysicsSection = false -- Set to true to hide this part of
 local aiDriversStationaryTime = {}
 local hasDriverBeenSentToPits = {}
 local firstFrame = true
-local TimeStationaryToCauseRetirement = 10
+local TimeStationaryToCauseRetirement = 7
 local driverFocusedInUI = 1
 
 -- Runs once on session restart
 ac.onSessionStart(function(sessionIndex, restarted)
-  if CheckSessionValidity() == true then
     ac.log("---------------------")
     ac.log("Session Restarted")
     ac.log("---------------------")
     firstFrame = true
-  end
 end)
 
 -- Runs once per frame
@@ -79,9 +77,10 @@ function script.windowMain(dt)
 
     -- Show Driver Live Info
     ui.text("  " .. ac.getDriverName(driverFocusedInUI))
-    ui.text("  Lap: " .. ac.getCar(driverFocusedInUI).lapCount + 1)
+    ui.text("  ID: " .. driverFocusedInUI)
+    ui.text("  Lap: " .. ac.getCar(driverFocusedInUI).lapCount +1)
     ui.text("  Time Stopped on track: " .. math.round(aiDriversStationaryTime[driverFocusedInUI], 1))
-    ui.text("  Has retired: " .. tostring(hasDriverBeenSentToPits[driverFocusedInUI]))
+    ui.text("  Has retired to pits: " .. tostring(hasDriverBeenSentToPits[driverFocusedInUI]))
 
     -- Disable track physics button
     ShowDisableTrackPhysicsButton()
@@ -143,7 +142,7 @@ function CheckAllAiForStopped(dt)
     if aiDriversStationaryTime[i] > TimeStationaryToCauseRetirement and hasDriverBeenSentToPits[i] == false and ac.getCar(i).isInPit == false and ac.getCar(i).isInPitlane == false then
       physics.teleportCarTo(i, ac.SpawnSet.Pits)
       hasDriverBeenSentToPits[i] = true
-      ac.log(ac.getDriverName(i) .. " has been retired and was sent to the pits")
+      ac.log(ac.getDriverName(i) .. " has been retired and sent to the pits")
     end
 
     -- Reset counter if they have got going again
