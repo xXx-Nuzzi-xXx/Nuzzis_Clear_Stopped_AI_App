@@ -126,6 +126,7 @@ function ConstructAiDriverArrays()
   do
     aiDriversStationaryTime[i] = 0
     hasDriverBeenSentToPits[i] = false
+    ac.setDriverVisible(i, true)
   end
 end
 
@@ -158,6 +159,7 @@ function KeepCarsSentToPitsStoppedInBox()
     if hasDriverBeenSentToPits[i] == true then
       physics.overrideSteering(i, 0)
       physics.setGentleStop(i, true)
+      ac.setDriverVisible(i, false)
     end
   end
 end
