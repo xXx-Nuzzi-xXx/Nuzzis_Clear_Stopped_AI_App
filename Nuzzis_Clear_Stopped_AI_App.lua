@@ -86,33 +86,9 @@ function script.windowMain(dt)
     -- Disable track physics button
     ShowDisableTrackPhysicsButton()
   else -- Session Invalid
-    -- CSP too low
-    if ac.getPatchVersionCode() < 3281 then -- 3281 == CSP 0.2.6  (Preview versions min CSP 0.2.7 - preview)
-      ui.text("    ERROR: CSP version too low:")
-      ui.text("    Min free = 0.2.6")
-      ui.text("    Min paid = 0.2.7 preview")
-
-    -- Not in race session
-    elseif ac.getSessionName(ac.getSim().currentSessionIndex) ~= "Quick Race" and ac.getSessionName(ac.getSim().currentSessionIndex) ~= "Race" then
-      ui.text("    NOTE: Not in race session: ")
-      ui.text("          App inactive.")
-
-    -- Track Physics
-    elseif physics.allowed() == false then
-      ui.text("   ERROR: Track Physics is disabled")
-      ShowEnableTrackPhysicsButton()
-
-    -- Online Session
-    elseif ac.getSim().isOnlineRace == true then
-      ui.text("  NOTE: Online session, app inactive")
-
-    -- Unknown error
-    else
-      ui.text("       ERROR: Unknown error.")
-    end
-
-    ui.newLine(0)
+    ShowWhySessionInvalid()
   end
+  ui.newLine(0)
 end
 
 -- FUNCTIONS
@@ -227,6 +203,37 @@ function ShowDisableTrackPhysicsButton()
     ui.text("  want to use track online. It")
     ui.text("  will stop server 'Checksum error'")
     ui.pushFont(4)
+  end
+end
+
+function ShowWhySessionInvalid()
+  -- CSP version is too low
+  if ac.getPatchVersionCode() < 3281 then   -- 3281 == CSP 0.2.6  (Preview versions min CSP 0.2.7 - preview)
+    ui.text("    ERROR: CSP version too low:")
+    ui.text("    Min free = 0.2.6")
+    ui.text("    Min paid = 0.2.7 preview")
+
+  -- Not in race session
+  elseif ac.getSessionName(ac.getSim().currentSessionIndex) ~= "Quick Race" and ac.getSessionName(ac.getSim().currentSessionIndex) ~= "Race" then
+    ui.text("    NOTE: Not in race session: ")
+    ui.text("          App inactive.")
+
+  -- Track Physics is disabled
+  elseif physics.allowed() == false then
+    ui.text("ERROR: Track Physics is disabled.")
+    ShowEnableTrackPhysicsButton()
+
+  -- In Online Session
+  elseif ac.getSim().isOnlineRace == true then
+    ui.text("NOTE: Online session, app inactive")
+
+  -- In Replay Mode
+  elseif ac.getSim().isReplayActive == true then
+    ui.text("  NOTE: Replay Mode, app inactive")
+
+  -- Unknown Error
+  else
+    ui.text("       ERROR: Unknown error.")
   end
 end
 
