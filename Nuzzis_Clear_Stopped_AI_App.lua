@@ -30,7 +30,7 @@ function script.update(dt)
       driverFocusedInUI = 1
       ac.log("Setup Complete")
     else -- Run Once Each Frame
-      -- Only run over duration of the race
+      -- Only run over duration of the session
       if ac.getSim().isSessionStarted == true and ac.getSim().isSessionFinished == false then
         CheckAllAiForStopped(dt)
         KeepCarsSentToPitsStoppedInBox()
@@ -102,8 +102,12 @@ function CheckSessionValidity()
     return false
   end
 
-  if ac.getSessionName(ac.getSim().currentSessionIndex) ~= "Quick Race" and ac.getSessionName(ac.getSim().currentSessionIndex) ~= "Race" then
-    ac.log("Not in a race session")
+  if ac.getSessionName(ac.getSim().currentSessionIndex) ~= "Quick Race"
+    and ac.getSessionName(ac.getSim().currentSessionIndex) ~= "Race"
+    and ac.getSessionName(ac.getSim().currentSessionIndex) ~= "car" -- "car" is for trackdays
+    and ac.getSessionName(ac.getSim().currentSessionIndex) ~= "Qualifying"
+  then
+    ac.log("Invalid session type: " .. ac.getSessionName(ac.getSim().currentSessionIndex))
     return false
   end
 
@@ -159,12 +163,17 @@ function CheckAllAiForStopped(dt)
 end
 
 function KeepCarsSentToPitsStoppedInBox()
-  for i = 1, (ac.getSim().carsCount - 1), 1
-  do
-    if hasDriverBeenSentToPits[i] == true then
-      physics.overrideSteering(i, 0)
-      physics.setGentleStop(i, true)
-      ac.setDriverVisible(i, false)
+  -- Only keep in stationary (aka retired) box if in race session. They can rejoin in quali and track days
+  if ac.getSessionName(ac.getSim().currentSessionIndex) == "Quick Race"
+    or ac.getSessionName(ac.getSim().currentSessionIndex) == "Race"
+  then
+    for i = 1, (ac.getSim().carsCount - 1), 1
+    do
+      if hasDriverBeenSentToPits[i] == true then
+        physics.overrideSteering(i, 0)
+        physics.setGentleStop(i, true)
+        ac.setDriverVisible(i, false)
+      end
     end
   end
 end
@@ -229,8 +238,12 @@ function ShowWhySessionInvalid()
     ui.text("    Min paid = 0.2.7 preview")
 
   -- Not in race session
-  elseif ac.getSessionName(ac.getSim().currentSessionIndex) ~= "Quick Race" and ac.getSessionName(ac.getSim().currentSessionIndex) ~= "Race" then
-    ui.text("    NOTE: Not in race session: ")
+  elseif ac.getSessionName(ac.getSim().currentSessionIndex) ~= "Quick Race"
+    and ac.getSessionName(ac.getSim().currentSessionIndex) ~= "Race"
+    and ac.getSessionName(ac.getSim().currentSessionIndex) ~= "car" -- "car" is for trackdays
+    and ac.getSessionName(ac.getSim().currentSessionIndex) ~= "Qualifying"
+  then
+    ui.text("    NOTE: Not in valid session type ")
     ui.text("          App inactive.")
 
   -- Track Physics is disabled
