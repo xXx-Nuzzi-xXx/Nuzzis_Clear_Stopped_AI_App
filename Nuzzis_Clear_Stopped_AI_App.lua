@@ -9,7 +9,7 @@ local aiDriversStationaryTime = {}
 local hasDriverBeenSentToPits = {}
 local firstFrame = true
 local driverFocusedInUI = 1
-local speedConsideredStopped = 50
+local speedConsideredStopped = 40
 local timeStationaryToCauseRetirement = 10 -- (Must be >= 10)
 
 
