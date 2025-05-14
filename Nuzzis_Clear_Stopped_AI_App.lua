@@ -2,7 +2,6 @@
 
 -- USER VARS START
 local hideDisableTrackPhysicsSection = false -- Set to true to hide this part of the in session UI.
-local TimeStationaryToCauseRetirement = 7    -- How long in seconds an AI is stationary on track before being retired to pits. (recommended 5 - 10)
 -- USER VARS END
 
 -- Global Vars
@@ -10,6 +9,9 @@ local aiDriversStationaryTime = {}
 local hasDriverBeenSentToPits = {}
 local firstFrame = true
 local driverFocusedInUI = 1
+local speedConsideredStopped = 50
+local timeStationaryToCauseRetirement = 10 -- (Must be >= 10)
+
 
 -- Runs once on session restart
 ac.onSessionStart(function(sessionIndex, restarted)
@@ -84,7 +86,7 @@ function script.windowMain(dt)
     ui.text("  " .. ac.getDriverName(driverFocusedInUI))
     ui.text("  ID: " .. driverFocusedInUI)
     ui.text("  Lap: " .. ac.getCar(driverFocusedInUI).lapCount +1)
-    ui.text("  Time Stopped on track: " .. math.round(aiDriversStationaryTime[driverFocusedInUI], 1))
+    ui.text("  Time Stopped on track: " .. tostring(math.round(aiDriversStationaryTime[driverFocusedInUI], 1)))
     ui.text("  Has been sent to pits: " .. tostring(hasDriverBeenSentToPits[driverFocusedInUI]))
 
     -- Disable track physics button
@@ -144,19 +146,19 @@ function CheckAllAiForStopped(dt)
   for i = 1, (ac.getSim().carsCount - 1), 1
   do
     -- Count stationary time when out on track and stopped.
-    if ac.getCar(i).speedKmh < 5 and ac.getCar(i).isInPitlane == false and ac.getCar(i).isInPit == false then
+    if ac.getCar(i).speedKmh < speedConsideredStopped and ac.getCar(i).isInPitlane == false and ac.getCar(i).isInPit == false then
       aiDriversStationaryTime[i] = aiDriversStationaryTime[i] + dt
     end
 
     -- Send back to pits when stopped on track too long, only do once
-    if aiDriversStationaryTime[i] > TimeStationaryToCauseRetirement and hasDriverBeenSentToPits[i] == false and ac.getCar(i).isInPit == false and ac.getCar(i).isInPitlane == false then
+    if aiDriversStationaryTime[i] > timeStationaryToCauseRetirement and hasDriverBeenSentToPits[i] == false and ac.getCar(i).isInPit == false and ac.getCar(i).isInPitlane == false then
       physics.teleportCarTo(i, ac.SpawnSet.Pits)
       hasDriverBeenSentToPits[i] = true
-      ac.log(ac.getDriverName(i) .. " has been sent to the pits")
+      ac.log(ac.getDriverName(i) .. " was stopped so has been sent to the pits")
     end
 
     -- Reset counter if they have got going again
-    if ac.getCar(i).speedKmh > 25 then
+    if ac.getCar(i).speedKmh > speedConsideredStopped then
       aiDriversStationaryTime[i] = 0
     end
 
